@@ -1,0 +1,65 @@
+name: Sync NIST OSCAL Catalog
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'   # Every Monday at 9:00 AM UTC
+  workflow_dispatch:        # Allow manual trigger from the Actions tab
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Check for NIST catalog updates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch and compare NIST source files
+        id: fetch
+        run: python scripts/fetch_nist_sources.py
+
+      - name: Generate delta migration
+        if: steps.fetch.outputs.changed == 'true'
+        run: python scripts/generate_nist_migration.py
+
+      - name: Regenerate SQL seed files
+        if: steps.fetch.outputs.changed == 'true'
+        run: python scripts/convert_nist_oscal.py
+
+      - name: Create branch and open PR
+        if: steps.fetch.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OLD_VERSION="${{ steps.fetch.outputs.old_version }}"
+          NEW_VERSION="${{ steps.fetch.outputs.new_version }}"
+          BRANCH="nist-sync/$(date +%Y-%m-%d)"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+          git add core/db/sources/ core/db/seed/ core/db/migrations/
+          git commit -m "chore: update NIST 800-53 catalog ${OLD_VERSION} → ${NEW_VERSION}"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "chore: NIST 800-53 catalog update ${OLD_VERSION} → ${NEW_VERSION}" \
+            --body-file .github/pr-body.md \
+            --base main \
+            --label "nist-sync,automated"
+
+      - name: No changes — log result
+        if: steps.fetch.outputs.changed == 'false'
+        run: |
+          echo "NIST catalog is up to date (version ${{ steps.fetch.outputs.new_version }})."
+          echo "No PR created."
