@@ -1,8 +1,11 @@
 """MCP JSON-RPC method routing."""
 
+import logging
 from .protocol import jsonrpc_success, jsonrpc_error
 from .tools import ALL_TOOLS
 from .handlers import TOOL_DISPATCH
+
+logger = logging.getLogger(__name__)
 
 SERVER_INFO = {
     "name": "grc-platform-mcp",
@@ -40,7 +43,8 @@ def dispatch(request: dict) -> dict:
         try:
             content = handler(arguments)
             return jsonrpc_success(req_id, {"content": content})
-        except Exception as exc:
-            return jsonrpc_error(req_id, -32603, str(exc))
+        except Exception:
+            logger.exception("Tool execution failed: %s", tool_name)
+            return jsonrpc_error(req_id, -32603, "Internal error")
 
     return jsonrpc_error(req_id, -32601, f"Method not found: {method}")
