@@ -5,6 +5,7 @@
 An AI-native GRC (Governance, Risk, and Compliance) platform that exposes NIST SP 800-53 Rev 5 controls and NIST AI Risk Management Framework crosswalk data via the Model Context Protocol (MCP). Designed for dual deployment: Docker Compose (quick start) and AWS CloudFormation (production).
 
 **Repo:** <https://github.com/gregsonier08/grc-platform>
+**Docker Hub:** `gregsonier01/grc_platform` (multi-platform: amd64 + arm64)
 **Owner:** Greg Sonier
 
 ---
@@ -35,59 +36,65 @@ The server code lives in `core/mcp-server/src/`. The business logic is identical
 
 ### Database
 
-PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`.
+PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`. Docker init handled by `core/db/initdb.sh` (shell entry point that runs schema then all seed files in order).
 
 ### Deployment Paths
 
 | Path               | Location         | Method                                                               |
 |--------------------|------------------|----------------------------------------------------------------------|
-| Docker Compose     | `deploy/docker/` | `docker compose up` — Postgres container + MCP server container      |
+| Docker Compose     | `deploy/docker/` | `docker compose up -d` — pulls pre-built image from Docker Hub       |
 | AWS CloudFormation | `deploy/aws/`    | CloudFormation template (not yet built) — RDS + Lambda + API Gateway |
 
 ---
 
 ## Current State
 
-### What Exists and Works
+### Phase 1 — Complete and Working
 
-- **Live AWS deployment**: Lambda + API Gateway + RDS in us-west-2
-  - RDS endpoint: `grc-dev-db.cbtyvi6qukg0.us-west-2.rds.amazonaws.com`
-  - Database name: `grcplatform`
-  - Admin user: `grcadmin`
-  - VPC: `grc-dev-vpc` (vpc-058442a39bf1c121d, 10.0.0.0/16)
-  - Security group: `grc-dev-rds-sg` (sg-06b2f289d5824ace9)
-  - Internet gateway attached, publicly accessible, PGAdmin connectivity confirmed
-- **Database tables (Phase 1 — populated)**:
+- **Docker Compose deployment**: Fully tested end-to-end. `docker compose up -d` pulls the pre-built image, initializes Postgres with all seed data, and starts the MCP server. Verified with live `tools/call` against AC-2.
+- **Docker Hub image**: `gregsonier01/grc_platform:latest` — multi-platform (linux/amd64 + linux/arm64). Auto-publishes via GitHub Actions on push to main when `core/mcp-server/**` changes.
+- **GitHub Actions**:
+  - `publish-docker.yml` — builds and pushes multi-platform image to Docker Hub
+  - `sync-nist.yml` — weekly NIST catalog sync (Monday 9AM UTC), opens PR if changed
+- **Branch protection**: Ruleset applied — PRs required, 1 approval, Admin bypass allowed
+- **Database tables (Phase 1 — populated in Docker)**:
   - `nist_families` — 20 control families
-  - `nist_controls` — Full 800-53 Rev 5 catalog (~1200 controls + enhancements)
-  - `nist_baselines` — Low/moderate/high assignments (177 controls at moderate)
-  - `nist_params` — Organization-defined parameters
-  - `nist_related_controls` — Control relationships
-- **MCP tools (Phase 1 — live)**:
+  - `nist_controls` — 324 base controls + 872 enhancements
+  - `nist_baselines` — 806 baseline assignments (low/moderate/high)
+  - `nist_params` — 1,600 organization-defined parameters
+  - `nist_related_controls` — 3,512 control relationships
+  - `catalog_versions` — tracks which NIST version is loaded
+- **MCP tools (Phase 1 — working)**:
   - `get_control(control_id)` — Full control with enhancements, baselines, related controls, params
   - `get_control_family(family)` — All controls in a family
   - `get_baseline(level)` — All base controls at a baseline level
-- **Original Lambda handler**: `core/mcp-server/handler_original.py` (single-file version currently deployed)
 
-### What Needs to Be Built
+### Phase 2 — Not Yet Built
 
-- **Database tables (Phase 2 — schema defined, not yet created in RDS)**:
+- **Database tables (schema defined in schema.sql, not yet seeded)**:
   - `ai_rmf_functions` — GOVERN, MAP, MEASURE, MANAGE
   - `ai_rmf_categories` — Category groupings (GOVERN 1, MAP 2, etc.)
   - `ai_rmf_subcategories` — 72 subcategories with descriptions
   - `crosswalk_mappings` — AI RMF ↔ 800-53 mappings with coverage level, rationale, guidance, evidence types
-- **Seed data**: AI RMF subcategories and crosswalk mappings need to be generated as SQL insert files
-  - AC family crosswalk data exists in a spreadsheet (24 mappings, environment-agnostic)
+- **Seed data needed**:
+  - Full 72 AI RMF subcategory SQL insert file
+  - AC family crosswalk mappings (24 mappings, environment-agnostic)
   - AU, CA, RA, SA families not yet mapped
-  - Existing NIST 800-53 data needs to be exported from RDS as seed SQL files
-- **MCP tools (Phase 2 — code written, not yet deployed)**:
+- **MCP tools (Phase 2 — code written in tools.py/handlers.py, not yet deployed)**:
   - `get_ai_rmf_subcategory(subcategory_id)` — Look up subcategory with parent info
   - `get_crosswalk(subcategory_id)` — Get 800-53 controls mapped to an AI RMF subcategory
   - `get_crosswalk_by_family(family)` — Get all AI RMF mappings for an 800-53 family
   - `get_crosswalk_gaps(function?)` — Find unmapped AI RMF subcategories
-- **AWS CloudFormation template** — `deploy/aws/template.yaml` (not yet created)
-- **Lambda deployment**: Refactored modular code needs to replace the single-file handler
-- **Seed SQL export**: Dump existing RDS data into `core/db/seed/` files for Docker path
+
+### AWS — Manual Setup (Not Yet Codified)
+
+- **Live AWS deployment** exists but was built manually:
+  - RDS endpoint: `grc-dev-db.cbtyvi6qukg0.us-west-2.rds.amazonaws.com`
+  - Database name: `grcplatform`, Admin user: `grcadmin`
+  - VPC: `grc-dev-vpc` (vpc-058442a39bf1c121d, 10.0.0.0/16)
+  - Security group: `grc-dev-rds-sg` (sg-06b2f289d5824ace9)
+- **Original Lambda handler**: `core/mcp-server/handler_original.py` (single-file, currently deployed)
+- **CloudFormation template**: Not yet built (`deploy/aws/template.yaml`)
 
 ---
 
@@ -98,6 +105,8 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
 3. **Tool registration is explicit** — Adding a new MCP tool requires: (a) define schema in tools.py, (b) write handler in handlers.py, (c) add to TOOL_DISPATCH dict, (d) add to ALL_TOOLS list. The MCP server does not auto-discover database tables.
 4. **Crosswalk data is universal** — Not organization-specific. No environment-specific tool names, vendor names, or team references in implementation guidance. Uses generic terms (e.g., "SIEM" not "DataDog", "IdP" not "Okta").
 5. **Self-hosted model priorities** (ranked): Ease of deployment > Customer data isolation > Update pushability > Cloud portability. This means we lean AWS-native and don't abstract for multi-cloud.
+6. **Pre-built Docker image** — MCP server image published to Docker Hub. Customers `docker compose up -d` without needing to build locally.
+7. **`.env` file approach** — Customers copy `.env.example` to `.env` and set their own password. Never committed. Password is set once on first Postgres init; changing it requires `docker compose down -v` to wipe the volume.
 
 ---
 
@@ -108,16 +117,21 @@ grc-platform/
 ├── CLAUDE.md                           # This file
 ├── README.md                           # Project overview + quick start
 ├── .gitignore
+├── .github/
+│   ├── workflows/
+│   │   ├── publish-docker.yml          # Build + push multi-platform image to Docker Hub
+│   │   └── sync-nist.yml               # Weekly NIST catalog sync
+│   └── rulesets/
+│       └── main-protection.json        # Branch protection ruleset
 ├── core/
 │   ├── db/
 │   │   ├── schema.sql                  # All table definitions (Phase 1 + 2)
+│   │   ├── initdb.sh                   # Docker Postgres init entry point
+│   │   ├── sources/                    # NIST OSCAL JSON source files (v5.2.0)
 │   │   ├── seed/                       # SQL insert files for reference data
-│   │   │   ├── README.md
-│   │   │   └── 10-ai-rmf-functions.sql # Sample seed file
-│   │   └── migrations/
-│   │       └── README.md
+│   │   └── migrations/                 # Delta SQL for upgrading existing deployments
 │   └── mcp-server/
-│       ├── handler_original.py         # Original single-file Lambda (reference)
+│       ├── handler_original.py         # Original single-file Lambda (reference, currently deployed)
 │       ├── Dockerfile
 │       ├── requirements.txt            # pg8000, fastapi, uvicorn, boto3
 │       └── src/
@@ -132,10 +146,14 @@ grc-platform/
 ├── deploy/
 │   ├── docker/
 │   │   ├── docker-compose.yml          # Postgres + MCP server containers
-│   │   ├── .env.example
-│   │   └── README.md
+│   │   ├── .env.example                # Copy to .env and set password before first run
+│   │   └── README.md                   # Full Docker deployment guide
 │   └── aws/
-│       └── README.md                   # Template not yet built
+│       └── README.md                   # CloudFormation template not yet built
+├── scripts/
+│   ├── convert_nist_oscal.py           # OSCAL JSON → SQL seed files
+│   ├── fetch_nist_sources.py           # Download + compare NIST sources from GitHub
+│   └── generate_nist_migration.py      # Generate delta SQL for NIST catalog updates
 └── docs/
     ├── architecture.md
     └── quickstart.md
@@ -145,15 +163,12 @@ grc-platform/
 
 ## Next Steps (Priority Order)
 
-1. **Create Phase 2 tables in RDS** — Run the ai_rmf_* and crosswalk_mappings DDL from schema.sql against grc-dev-db
-2. **Generate and load seed data**:
-   - Export existing NIST 800-53 data from RDS into seed SQL files
-   - Create the full 72 AI RMF subcategory seed data
-   - Convert AC family crosswalk spreadsheet data into seed SQL
-3. **Expand crosswalk mappings** — Map AU, CA, RA, SA families to AI RMF (these close the biggest coverage gaps, especially MEASURE at 0%)
-4. **Deploy refactored Lambda** — Replace handler_original.py with the modular src/ package
-5. **Build CloudFormation template** — `deploy/aws/template.yaml` codifying the existing manual AWS setup
-6. **Test Docker Compose path** — Verify the full Docker deployment works end-to-end with seed data
+1. **Phase 2 seed data** — Generate SQL for 72 AI RMF subcategories (`10-ai-rmf-subcategories.sql`)
+2. **AC family crosswalk** — Convert spreadsheet data to SQL (`20-crosswalk-ac.sql`, 24 mappings)
+3. **Expand crosswalk** — Map AU, CA, RA, SA families (closes biggest coverage gaps)
+4. **Phase 2 MCP tools** — Wire up the 4 crosswalk tools already stubbed in tools.py/handlers.py
+5. **Deploy refactored Lambda** — Replace `handler_original.py` with the modular `src/` package
+6. **Build CloudFormation template** — `deploy/aws/template.yaml` codifying the existing manual AWS setup
 
 ---
 
@@ -177,6 +192,8 @@ DATABASE_URL=postgresql://grcadmin:password@db:5432/grcplatform
 PORT=8080
 ```
 
+Set via `deploy/docker/.env` (copied from `.env.example`).
+
 ### AWS Lambda Path
 
 ``` text
@@ -190,9 +207,19 @@ ENVIRONMENT=dev
 
 ## Testing
 
-To verify MCP tools work:
+### Start the local stack
 
 ```bash
+cd deploy/docker
+docker compose up -d
+```
+
+### Verify MCP tools
+
+```bash
+# Health check
+curl http://localhost:8080/health
+
 # tools/list
 curl -s http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
@@ -202,4 +229,16 @@ curl -s http://localhost:8080/mcp \
 curl -s http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_control","arguments":{"control_id":"AC-2"}}}'
+```
+
+### Tear down (preserves data volume)
+
+```bash
+docker compose down
+```
+
+### Tear down and wipe data (full reset)
+
+```bash
+docker compose down -v
 ```
