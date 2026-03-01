@@ -10,6 +10,8 @@ Designed for AI clients such as Claude to query compliance controls, baselines, 
 
 **Prerequisites:** Docker and Docker Compose installed.
 
+The MCP server image is pre-built and published to [Docker Hub](https://hub.docker.com/r/gregsonier01/grc_platform) — no local build required.
+
 ```bash
 # 1. Clone the repo
 git clone https://github.com/gregsonier08/grc-platform.git
@@ -89,6 +91,7 @@ grc-platform/
 │   └── generate_nist_migration.py # Generates delta SQL migrations
 └── .github/
     └── workflows/
+        ├── publish-docker.yml  # Build + push multi-platform image to Docker Hub
         └── sync-nist.yml       # Weekly NIST catalog sync workflow
 ```
 
