@@ -8,6 +8,9 @@ on:
       - 'core/mcp-server/**'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-and-push:
     name: Build and push MCP server image
