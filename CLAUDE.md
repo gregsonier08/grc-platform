@@ -69,31 +69,32 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
   - `get_control_family(family)` — All controls in a family
   - `get_baseline(level)` — All base controls at a baseline level
 
-### Phase 2 — Not Yet Built
+### Phase 2 — Complete and Working
 
-- **Database tables (schema defined in schema.sql, not yet seeded)**:
-  - `ai_rmf_functions` — GOVERN, MAP, MEASURE, MANAGE
-  - `ai_rmf_categories` — Category groupings (GOVERN 1, MAP 2, etc.)
-  - `ai_rmf_subcategories` — 72 subcategories with descriptions
-  - `crosswalk_mappings` — AI RMF ↔ 800-53 mappings with coverage level, rationale, guidance, evidence types
-- **Seed data needed**:
-  - Full 72 AI RMF subcategory SQL insert file
-  - AC family crosswalk mappings (24 mappings, environment-agnostic)
-  - AU, CA, RA, SA families not yet mapped
-- **MCP tools (Phase 2 — code written in tools.py/handlers.py, not yet deployed)**:
+- **Database tables** — all seeded in Docker and RDS:
+  - `ai_rmf_functions` — 4 functions (GOVERN, MAP, MEASURE, MANAGE)
+  - `ai_rmf_categories` — 19 categories
+  - `ai_rmf_subcategories` — 72 subcategories with full descriptions
+  - `crosswalk_mappings` — 211 mappings across AC, AU, CA, RA, SA families; 70 of 72 subcategories covered (2 genuine framework gaps)
+- **MCP tools (Phase 2 — live in Docker and Lambda)**:
   - `get_ai_rmf_subcategory(subcategory_id)` — Look up subcategory with parent info
   - `get_crosswalk(subcategory_id)` — Get 800-53 controls mapped to an AI RMF subcategory
   - `get_crosswalk_by_family(family)` — Get all AI RMF mappings for an 800-53 family
   - `get_crosswalk_gaps(function?)` — Find unmapped AI RMF subcategories
+- **Coverage gaps** (intentional — no 800-53 equivalent exists):
+  - `MEASURE 2.2` — Human subjects evaluation requirements (IRB/informed consent)
+  - `MEASURE 2.12` — Environmental impact and sustainability of AI model training
 
-### AWS — Manual Setup (Not Yet Codified)
+### AWS — Live (Manual Setup, Not Yet Codified)
 
-- **Live AWS deployment** exists but was built manually:
+- **Live AWS deployment** — all 7 MCP tools verified working:
+  - API Gateway endpoint: `https://0tdx0fif8b.execute-api.us-west-2.amazonaws.com/mcp`
+  - Lambda: `grc-dev-mcp-server` — handler `src.lambda_handler.handler` (modular `src/` package)
   - RDS endpoint: `grc-dev-db.cbtyvi6qukg0.us-west-2.rds.amazonaws.com`
   - Database name: `grcplatform`, Admin user: `grcadmin`
   - VPC: `grc-dev-vpc` (vpc-058442a39bf1c121d, 10.0.0.0/16)
   - Security group: `grc-dev-rds-sg` (sg-06b2f289d5824ace9)
-- **Original Lambda handler**: `core/mcp-server/handler_original.py` (single-file, currently deployed)
+- **Original Lambda handler**: `core/mcp-server/handler_original.py` (reference only — no longer deployed)
 - **CloudFormation template**: Not yet built (`deploy/aws/template.yaml`)
 
 ---
@@ -131,7 +132,7 @@ grc-platform/
 │   │   ├── seed/                       # SQL insert files for reference data
 │   │   └── migrations/                 # Delta SQL for upgrading existing deployments
 │   └── mcp-server/
-│       ├── handler_original.py         # Original single-file Lambda (reference, currently deployed)
+│       ├── handler_original.py         # Original single-file Lambda (reference only — no longer deployed)
 │       ├── Dockerfile
 │       ├── requirements.txt            # pg8000, fastapi, uvicorn, boto3
 │       └── src/
@@ -163,12 +164,9 @@ grc-platform/
 
 ## Next Steps (Priority Order)
 
-1. **Phase 2 seed data** — Generate SQL for 72 AI RMF subcategories (`10-ai-rmf-subcategories.sql`)
-2. **AC family crosswalk** — Convert spreadsheet data to SQL (`20-crosswalk-ac.sql`, 24 mappings)
-3. **Expand crosswalk** — Map AU, CA, RA, SA families (closes biggest coverage gaps)
-4. **Phase 2 MCP tools** — Wire up the 4 crosswalk tools already stubbed in tools.py/handlers.py
-5. **Deploy refactored Lambda** — Replace `handler_original.py` with the modular `src/` package
-6. **Build CloudFormation template** — `deploy/aws/template.yaml` codifying the existing manual AWS setup
+1. **Build CloudFormation template** — `deploy/aws/template.yaml` codifying the existing manual AWS setup (Lambda + API Gateway + RDS + VPC/security groups)
+2. **Expand crosswalk coverage** — Map additional 800-53 families (SI, CM, SC, IR, etc.) to close more AI RMF gaps
+3. **Test Docker Compose from scratch** — Run `docker compose down -v && docker compose up -d` to verify all seed files load cleanly for new users
 
 ---
 
