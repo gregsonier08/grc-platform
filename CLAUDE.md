@@ -93,8 +93,8 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
   - Lambda: `grc-dev-mcp-server` — handler `src.lambda_handler.handler` (modular `src/` package)
   - RDS endpoint: `grc-dev-db.<YOUR-RDS-ID>.us-west-2.rds.amazonaws.com`
   - Database name: `grcplatform`, Admin user: `grcadmin`
-  - VPC: `grc-dev-vpc` (<YOUR-VPC-ID>, 10.0.0.0/16)
-  - Security group: `grc-dev-rds-sg` (<YOUR-SG-ID>)
+  - VPC: `grc-dev-vpc` (`<YOUR-VPC-ID>`, 10.0.0.0/16)
+  - Security group: `grc-dev-rds-sg` (`<YOUR-SG-ID>`)
 - **API key authentication** — MCP endpoint requires `x-api-key` header. Key stored as Lambda env var (`API_KEY`). Auth skipped when env var is empty (Docker/local path). Uses `hmac.compare_digest()` for timing-safe comparison.
 - **CloudFormation stacks** (3 stacks in `deploy/aws/`):
   - `vpc.yaml` — VPC, private subnets, security groups, VPC endpoints
