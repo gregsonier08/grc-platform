@@ -75,7 +75,7 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
   - `ai_rmf_functions` — 4 functions (GOVERN, MAP, MEASURE, MANAGE)
   - `ai_rmf_categories` — 19 categories
   - `ai_rmf_subcategories` — 72 subcategories with full descriptions
-  - `crosswalk_mappings` — 430 mappings across 14 families (AC, AT, AU, CA, CM, IR, PL, PM, PT, RA, SA, SC, SI, SR); 70 of 72 subcategories covered
+  - `crosswalk_mappings` — 490 mappings across all 20 control families; 70 of 72 subcategories covered
 - **MCP tools (Phase 2 — live in Docker and Lambda)**:
   - `get_ai_rmf_subcategory(subcategory_id)` — Look up subcategory with parent info
   - `get_crosswalk(subcategory_id)` — Get 800-53 controls mapped to an AI RMF subcategory
@@ -175,8 +175,7 @@ grc-platform/
 
 ## Next Steps (Priority Order)
 
-1. **Expand crosswalk coverage** — Map remaining 800-53 families (IA, PS, CP, MA, MP, PE) for completeness
-2. **Test Docker Compose from scratch** — Run `docker compose down -v && docker compose up -d` to verify all seed files load cleanly for new users
+1. **Test Docker Compose from scratch** — Run `docker compose down -v && docker compose up -d` to verify all seed files load cleanly for new users
 
 ---
 
