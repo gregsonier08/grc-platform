@@ -75,7 +75,7 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
   - `ai_rmf_functions` — 4 functions (GOVERN, MAP, MEASURE, MANAGE)
   - `ai_rmf_categories` — 19 categories
   - `ai_rmf_subcategories` — 72 subcategories with full descriptions
-  - `crosswalk_mappings` — 490 mappings across all 20 control families; 70 of 72 subcategories covered
+  - `crosswalk_mappings` — 666 mappings across all 20 control families (full quality); 70 of 72 subcategories covered
 - **MCP tools (Phase 2 — live in Docker and Lambda)**:
   - `get_ai_rmf_subcategory(subcategory_id)` — Look up subcategory with parent info
   - `get_crosswalk(subcategory_id)` — Get 800-53 controls mapped to an AI RMF subcategory
@@ -184,9 +184,10 @@ grc-platform/
 
 ## Next Steps (Priority Order)
 
-1. **Set up GitHub Actions AWS credentials** — Add `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` secrets to the GitHub repo for the `apply-nist-update.yml` workflow
-2. **Add more MCP tools** — Search across controls, compare baselines, get enhancement details
-3. **Add tests** — Unit tests for handlers, integration tests for the MCP endpoint
+1. **Test Docker Compose from scratch** — Run `docker compose down -v && docker compose up -d` to verify all 20 crosswalk seed files load cleanly for new users
+2. **Set up GitHub Actions AWS credentials** — Add `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` secrets to the GitHub repo for the `apply-nist-update.yml` workflow
+3. **Add more MCP tools** — Search across controls, compare baselines, get enhancement details
+4. **Add tests** — Unit tests for handlers, integration tests for the MCP endpoint
 
 ---
 
@@ -196,7 +197,7 @@ grc-platform/
 - **Control IDs**: Stored lowercase in DB (`ac-2`), displayed uppercase in labels (`AC-2`)
 - **AI RMF IDs**: Stored as-is (`GOVERN 1.1`, `MAP 2.3`) — space-separated function + number
 - **Coverage levels**: Direct, Strong, Partial, Supportive (defined in crosswalk_mappings)
-- **Seed file numbering**: 02-09 NIST data, 10-19 AI RMF data, 20-29 crosswalk data
+- **Seed file numbering**: 02-09 NIST data, 10-19 AI RMF data, 20-39 crosswalk data (one file per 800-53 family)
 - **Python**: Use pg8000.native with named parameters (`:param` style)
 
 ---
