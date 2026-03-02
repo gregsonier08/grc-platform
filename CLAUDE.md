@@ -85,7 +85,7 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
   - `MEASURE 2.2` — Human subjects evaluation requirements (IRB/informed consent)
   - `MEASURE 2.12` — Environmental impact and sustainability of AI model training
 
-### AWS — Live (Manual Setup, Not Yet Codified)
+### AWS — Live (Codified in CloudFormation)
 
 - **Live AWS deployment** — all 7 MCP tools verified working:
   - API Gateway endpoint: `https://0tdx0fif8b.execute-api.us-west-2.amazonaws.com/mcp`
@@ -94,8 +94,14 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
   - Database name: `grcplatform`, Admin user: `grcadmin`
   - VPC: `grc-dev-vpc` (vpc-058442a39bf1c121d, 10.0.0.0/16)
   - Security group: `grc-dev-rds-sg` (sg-06b2f289d5824ace9)
+- **CloudFormation stacks** (3 stacks in `deploy/aws/`):
+  - `vpc.yaml` — VPC, private subnets, security groups, VPC endpoints
+  - `data.yaml` — RDS PostgreSQL, Secrets Manager, S3
+  - `compute.yaml` — Lambda (MCP server + OSCAL loader), API Gateway HTTP API
+- **Deployment scripts** (`scripts/`):
+  - `deploy_lambda.sh` — builds and uploads the `src/` package to Lambda
+  - `seed_rds.sh` — drops/recreates tables and loads all seed files into RDS
 - **Original Lambda handler**: `core/mcp-server/handler_original.py` (reference only — no longer deployed)
-- **CloudFormation template**: Not yet built (`deploy/aws/template.yaml`)
 
 ---
 
@@ -150,11 +156,16 @@ grc-platform/
 │   │   ├── .env.example                # Copy to .env and set password before first run
 │   │   └── README.md                   # Full Docker deployment guide
 │   └── aws/
-│       └── README.md                   # CloudFormation template not yet built
+│       ├── vpc.yaml                    # CloudFormation: VPC, subnets, security groups, endpoints
+│       ├── data.yaml                   # CloudFormation: RDS, Secrets Manager, S3
+│       ├── compute.yaml                # CloudFormation: Lambda, API Gateway
+│       └── README.md                   # AWS deployment guide
 ├── scripts/
 │   ├── convert_nist_oscal.py           # OSCAL JSON → SQL seed files
 │   ├── fetch_nist_sources.py           # Download + compare NIST sources from GitHub
-│   └── generate_nist_migration.py      # Generate delta SQL for NIST catalog updates
+│   ├── generate_nist_migration.py      # Generate delta SQL for NIST catalog updates
+│   ├── deploy_lambda.sh               # Build + deploy Lambda code package
+│   └── seed_rds.sh                     # Drop/recreate tables + seed RDS
 └── docs/
     ├── architecture.md
     └── quickstart.md
@@ -164,9 +175,8 @@ grc-platform/
 
 ## Next Steps (Priority Order)
 
-1. **Build CloudFormation template** — `deploy/aws/template.yaml` codifying the existing manual AWS setup (Lambda + API Gateway + RDS + VPC/security groups)
-2. **Expand crosswalk coverage** — Map additional 800-53 families (SI, CM, SC, IR, etc.) to close more AI RMF gaps
-3. **Test Docker Compose from scratch** — Run `docker compose down -v && docker compose up -d` to verify all seed files load cleanly for new users
+1. **Expand crosswalk coverage** — Map additional 800-53 families (SI, CM, SC, IR, etc.) to close more AI RMF gaps
+2. **Test Docker Compose from scratch** — Run `docker compose down -v && docker compose up -d` to verify all seed files load cleanly for new users
 
 ---
 
