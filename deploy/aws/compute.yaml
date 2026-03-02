@@ -6,6 +6,10 @@ Parameters:
     Type: String
     Default: dev
     AllowedValues: [dev, staging, prod]
+  ApiKey:
+    Type: String
+    NoEcho: true
+    Description: API key for MCP endpoint authentication (leave empty to disable)
 
 Resources:
   LambdaExecutionRole:
@@ -70,6 +74,7 @@ Resources:
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
+          API_KEY: !Ref ApiKey
           DB_SECRET_ARN:
             !ImportValue
             Fn::Sub: grc-${Environment}-db-secret-arn

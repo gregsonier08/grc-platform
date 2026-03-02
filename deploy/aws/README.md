@@ -40,12 +40,14 @@ aws cloudformation deploy \
   --region us-west-2
 
 # 3. Compute (depends on VPC + data exports)
+API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 aws cloudformation deploy \
   --stack-name grc-${ENV}-compute \
   --template-file deploy/aws/compute.yaml \
-  --parameter-overrides Environment=${ENV} \
+  --parameter-overrides Environment=${ENV} ApiKey=${API_KEY} \
   --capabilities CAPABILITY_NAMED_IAM \
   --region us-west-2
+echo "Save your API key: ${API_KEY}"
 
 # 4. Deploy Lambda code (CloudFormation only creates the function infrastructure)
 ./scripts/deploy_lambda.sh ${ENV}
@@ -68,6 +70,26 @@ When MCP server code changes (no infrastructure changes needed):
 - **RDS** — private subnets only, not publicly accessible. Add a temporary security group rule if direct DB access is needed (e.g., for seeding)
 - **Lambda code** — CloudFormation templates contain a placeholder `ZipFile`. Actual code is deployed via `scripts/deploy_lambda.sh`. This keeps the templates stable; code updates don't require stack updates
 - **DB credentials** — stored in Secrets Manager at `grc/{env}/db-credentials`. Lambda reads them at runtime via the VPC endpoint
+- **API key authentication** — the MCP endpoint requires an `x-api-key` header. The key is passed to Lambda via the `API_KEY` environment variable (set during CloudFormation deploy). If `API_KEY` is empty, auth is disabled
+
+## Claude Desktop configuration
+
+Add the API key to your Claude Desktop MCP server config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "grc-platform": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "https://YOUR-API-ID.execute-api.us-west-2.amazonaws.com/mcp",
+        "--header", "x-api-key:YOUR_API_KEY"
+      ]
+    }
+  }
+}
+```
 
 ## Current dev environment
 
