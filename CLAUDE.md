@@ -68,6 +68,7 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
   - `get_control(control_id)` — Full control with enhancements, baselines, related controls, params
   - `get_control_family(family)` — All controls in a family
   - `get_baseline(level)` — All base controls at a baseline level
+  - `search_controls(query, limit?)` — Keyword search across titles, descriptions, and guidance
 
 ### Phase 2 — Complete and Working
 
@@ -87,7 +88,7 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
 
 ### AWS — Live (Codified in CloudFormation)
 
-- **Live AWS deployment** — all 7 MCP tools verified working:
+- **Live AWS deployment** — all 8 MCP tools verified working:
   - API Gateway endpoint: `https://<YOUR-API-ID>.execute-api.us-west-2.amazonaws.com/mcp`
   - Lambda: `grc-dev-mcp-server` — handler `src.lambda_handler.handler` (modular `src/` package)
   - RDS endpoint: `grc-dev-db.<YOUR-RDS-ID>.us-west-2.rds.amazonaws.com`
@@ -184,10 +185,10 @@ grc-platform/
 
 ## Next Steps (Priority Order)
 
-1. **Test Docker Compose from scratch** — Run `docker compose down -v && docker compose up -d` to verify all 20 crosswalk seed files load cleanly for new users
-2. **Set up GitHub Actions AWS credentials** — Add `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` secrets to the GitHub repo for the `apply-nist-update.yml` workflow
-3. **Add more MCP tools** — Search across controls, compare baselines, get enhancement details
-4. **Add tests** — Unit tests for handlers, integration tests for the MCP endpoint
+1. **Build CloudFormation template** — `deploy/aws/template.yaml` codifying the existing manual AWS setup (Lambda + API Gateway + RDS + VPC/security groups)
+2. **Add more MCP tools** — Compare baselines, get enhancement details, search AI RMF subcategories
+3. **Add tests** — Unit tests for handlers, integration tests for the MCP endpoint
+4. **Publish updated Docker image** — Trigger GitHub Actions build to include `search_controls` in the Docker Hub image
 
 ---
 
