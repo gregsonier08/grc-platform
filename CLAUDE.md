@@ -26,7 +26,7 @@ PostgreSQL Database
 
 The server code lives in `core/mcp-server/src/`. The business logic is identical for both deployment paths — only the entry point differs:
 
-- **`lambda_handler.py`** — AWS Lambda entry point (wraps dispatch in API Gateway proxy response format)
+- **`lambda_handler.py`** — AWS Lambda entry point (API key auth + API Gateway proxy response format)
 - **`server.py`** — FastAPI HTTP server entry point (Docker/local, runs via uvicorn on port 8080)
 - **`dispatch.py`** — Shared routing logic (initialize, tools/list, tools/call)
 - **`handlers.py`** — Tool implementation functions (SQL queries) + TOOL_DISPATCH dict
@@ -43,7 +43,7 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
 | Path               | Location         | Method                                                               |
 |--------------------|------------------|----------------------------------------------------------------------|
 | Docker Compose     | `deploy/docker/` | `docker compose up -d` — pulls pre-built image from Docker Hub       |
-| AWS CloudFormation | `deploy/aws/`    | CloudFormation template (not yet built) — RDS + Lambda + API Gateway |
+| AWS CloudFormation | `deploy/aws/`    | 3 CloudFormation stacks — VPC + RDS + Lambda/API Gateway             |
 
 ---
 
@@ -94,10 +94,11 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
   - Database name: `grcplatform`, Admin user: `grcadmin`
   - VPC: `grc-dev-vpc` (vpc-058442a39bf1c121d, 10.0.0.0/16)
   - Security group: `grc-dev-rds-sg` (sg-06b2f289d5824ace9)
+- **API key authentication** — MCP endpoint requires `x-api-key` header. Key stored as Lambda env var (`API_KEY`). Auth skipped when env var is empty (Docker/local path). Uses `hmac.compare_digest()` for timing-safe comparison.
 - **CloudFormation stacks** (3 stacks in `deploy/aws/`):
   - `vpc.yaml` — VPC, private subnets, security groups, VPC endpoints
   - `data.yaml` — RDS PostgreSQL, Secrets Manager, S3
-  - `compute.yaml` — Lambda (MCP server + OSCAL loader), API Gateway HTTP API
+  - `compute.yaml` — Lambda (MCP server + OSCAL loader), API Gateway HTTP API, `ApiKey` parameter
 - **Deployment scripts** (`scripts/`):
   - `deploy_lambda.sh` — builds and uploads the `src/` package to Lambda
   - `seed_rds.sh` — drops/recreates tables and loads all seed files into RDS
@@ -175,7 +176,9 @@ grc-platform/
 
 ## Next Steps (Priority Order)
 
-1. **Test Docker Compose from scratch** — Run `docker compose down -v && docker compose up -d` to verify all seed files load cleanly for new users
+1. **OSCAL loader Lambda** — Automate loading NIST catalog updates from S3 into RDS (infrastructure exists in CloudFormation, code is placeholder)
+2. **Add more MCP tools** — Search across controls, compare baselines, get enhancement details
+3. **Add tests** — Unit tests for handlers, integration tests for the MCP endpoint
 
 ---
 
@@ -208,6 +211,7 @@ DB_SECRET_ARN=arn:aws:secretsmanager:us-west-2:995433633495:secret:...
 DB_HOST=grc-dev-db.cbtyvi6qukg0.us-west-2.rds.amazonaws.com
 DB_NAME=grcplatform
 ENVIRONMENT=dev
+API_KEY=<secret>  # Required — requests without valid x-api-key header get 403
 ```
 
 ---
