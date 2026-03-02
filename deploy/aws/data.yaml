@@ -1,0 +1,134 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: GRC Platform - RDS PostgreSQL, Secrets Manager, S3
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: Master password for the RDS PostgreSQL instance
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub grc-${Environment}-db-subnet-group
+      DBSubnetGroupDescription: Subnet group for GRC RDS instance
+      SubnetIds:
+        - !ImportValue
+          Fn::Sub: grc-${Environment}-private-subnet-a
+        - !ImportValue
+          Fn::Sub: grc-${Environment}-private-subnet-b
+      Tags:
+        - Key: Project
+          Value: grc-platform
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: greg
+
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub grc-${Environment}-db
+      DBInstanceClass: db.t4g.micro
+      Engine: postgres
+      EngineVersion: '16'
+      DBName: grcplatform
+      MasterUsername: grcadmin
+      MasterUserPassword: !Ref DBPassword
+      AllocatedStorage: 20
+      MaxAllocatedStorage: 50
+      StorageType: gp3
+      MultiAZ: false
+      PubliclyAccessible: false
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !ImportValue
+          Fn::Sub: grc-${Environment}-rds-sg-id
+      BackupRetentionPeriod: 7
+      DeletionProtection: false
+      StorageEncrypted: true
+      Tags:
+        - Key: Name
+          Value: !Sub grc-${Environment}-db
+        - Key: Project
+          Value: grc-platform
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: greg
+
+  DBSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub grc/${Environment}/db-credentials
+      Description: RDS credentials for GRC platform
+      SecretString: !Sub |
+        {
+          "username": "grcadmin",
+          "password": "${DBPassword}",
+          "host": "${RDSInstance.Endpoint.Address}",
+          "port": "${RDSInstance.Endpoint.Port}",
+          "dbname": "grcplatform"
+        }
+      Tags:
+        - Key: Project
+          Value: grc-platform
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: greg
+
+  OSCALBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub grc-${Environment}-oscal-data-${AWS::AccountId}
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: grc-platform
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: greg
+
+Outputs:
+  RDSEndpoint:
+    Value: !GetAtt RDSInstance.Endpoint.Address
+    Export:
+      Name: !Sub grc-${Environment}-rds-endpoint
+
+  RDSPort:
+    Value: !GetAtt RDSInstance.Endpoint.Port
+    Export:
+      Name: !Sub grc-${Environment}-rds-port
+
+  DBSecretArn:
+    Value: !Ref DBSecret
+    Export:
+      Name: !Sub grc-${Environment}-db-secret-arn
+
+  OSCALBucketName:
+    Value: !Ref OSCALBucket
+    Export:
+      Name: !Sub grc-${Environment}-oscal-bucket
+
+  OSCALBucketArn:
+    Value: !GetAtt OSCALBucket.Arn
+    Export:
+      Name: !Sub grc-${Environment}-oscal-bucket-arn

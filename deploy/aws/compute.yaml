@@ -1,0 +1,221 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: GRC Platform - Lambda MCP Server, API Gateway
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub grc-${Environment}-lambda-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub grc-${Environment}-lambda-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/grc-*
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:grc/*
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                Resource: '*'
+      Tags:
+        - Key: Project
+          Value: grc-platform
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: greg
+
+  MCPFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub grc-${Environment}-mcp-server
+      Runtime: python3.12
+      # Handler matches the modular src/ package deployed via aws lambda update-function-code
+      Handler: src.lambda_handler.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 29
+      MemorySize: 256
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue
+            Fn::Sub: grc-${Environment}-lambda-sg-id
+        SubnetIds:
+          - !ImportValue
+            Fn::Sub: grc-${Environment}-private-subnet-a
+          - !ImportValue
+            Fn::Sub: grc-${Environment}-private-subnet-b
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          DB_SECRET_ARN:
+            !ImportValue
+            Fn::Sub: grc-${Environment}-db-secret-arn
+      # Placeholder code — deploy actual package with: scripts/deploy_lambda.sh
+      Code:
+        ZipFile: |
+          import json
+
+          def handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'headers': {'Content-Type': 'application/json'},
+                  'body': json.dumps({'error': 'Lambda not yet deployed — run scripts/deploy_lambda.sh'})
+              }
+      Tags:
+        - Key: Project
+          Value: grc-platform
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: greg
+
+  MCPLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/grc-${Environment}-mcp-server
+      RetentionInDays: 14
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub grc-${Environment}-api
+      ProtocolType: HTTP
+
+  HttpApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt MCPFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  HttpApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /mcp
+      Target: !Sub integrations/${HttpApiIntegration}
+
+  LambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref MCPFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*
+
+  OSCALLoaderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub grc-${Environment}-oscal-loader-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: OSCALLoaderAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  Fn::ImportValue: !Sub grc-${Environment}-db-secret-arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - Fn::ImportValue: !Sub grc-${Environment}-oscal-bucket-arn
+                  - !Sub
+                    - '${BucketArn}/*'
+                    - BucketArn:
+                        Fn::ImportValue: !Sub grc-${Environment}-oscal-bucket-arn
+
+  OSCALLoaderFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub grc-${Environment}-oscal-loader
+      Runtime: python3.12
+      Handler: handler.lambda_handler
+      Role: !GetAtt OSCALLoaderRole.Arn
+      Timeout: 900
+      MemorySize: 1024
+      VpcConfig:
+        SubnetIds:
+          - Fn::ImportValue: !Sub grc-${Environment}-private-subnet-a
+          - Fn::ImportValue: !Sub grc-${Environment}-private-subnet-b
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub grc-${Environment}-lambda-sg-id
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          DB_SECRET_ARN:
+            Fn::ImportValue: !Sub grc-${Environment}-db-secret-arn
+          DB_HOST:
+            Fn::ImportValue: !Sub grc-${Environment}-rds-endpoint
+          DB_NAME: grcplatform
+          OSCAL_BUCKET:
+            Fn::ImportValue: !Sub grc-${Environment}-oscal-bucket
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {'status': 'placeholder'}
+      Tags:
+        - Key: Project
+          Value: grc-platform
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: greg
+
+  OSCALLoaderLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/grc-${Environment}-oscal-loader
+      RetentionInDays: 14
+
+Outputs:
+  ApiEndpoint:
+    Value: !GetAtt HttpApi.ApiEndpoint
+    Export:
+      Name: !Sub grc-${Environment}-api-endpoint
+
+  MCPFunctionArn:
+    Value: !GetAtt MCPFunction.Arn
+    Export:
+      Name: !Sub grc-${Environment}-mcp-function-arn
+
+  OSCALLoaderFunctionName:
+    Value: !Ref OSCALLoaderFunction
+    Export:
+      Name: !Sub grc-${Environment}-oscal-loader-name
