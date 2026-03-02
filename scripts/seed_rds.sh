@@ -44,20 +44,7 @@ echo "Applying schema..."
 psql -f core/db/schema.sql -q
 
 echo "Loading seed files..."
-for f in core/db/seed/02-nist-families.sql \
-          core/db/seed/03-nist-controls.sql \
-          core/db/seed/04-nist-baselines.sql \
-          core/db/seed/05-nist-params.sql \
-          core/db/seed/06-nist-related-controls.sql \
-          core/db/seed/09-catalog-version.sql \
-          core/db/seed/10-ai-rmf-functions.sql \
-          core/db/seed/11-ai-rmf-categories.sql \
-          core/db/seed/12-ai-rmf-subcategories.sql \
-          core/db/seed/20-crosswalk-ac.sql \
-          core/db/seed/21-crosswalk-au.sql \
-          core/db/seed/22-crosswalk-ca.sql \
-          core/db/seed/23-crosswalk-ra.sql \
-          core/db/seed/24-crosswalk-sa.sql; do
+for f in $(ls core/db/seed/*.sql | sort); do
   psql -f "$f" -q && echo "  OK: $f"
 done
 
