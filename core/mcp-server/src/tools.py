@@ -106,6 +106,28 @@ ALL_TOOLS = [
         },
     },
     {
+        "name": "search_controls",
+        "description": (
+            "Search NIST SP 800-53 Rev 5 controls by keyword. Searches across control "
+            "titles, descriptions, and guidance text. Returns concise results (ID, title, "
+            "family, match snippet). Use get_control() to retrieve full details for any match."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search keyword or phrase, e.g. 'encryption', 'incident response', 'multi-factor'",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum results to return (default 25, max 50)",
+                },
+            },
+            "required": ["query"],
+        },
+    },
+    {
         "name": "get_crosswalk_gaps",
         "description": (
             "Find AI RMF 1.0 subcategories that have no mapped NIST 800-53 controls, "

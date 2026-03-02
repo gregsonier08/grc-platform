@@ -140,6 +140,69 @@ def handle_get_baseline(arguments: dict) -> list:
     return tool_result_content(json.dumps(controls, indent=2))
 
 
+def handle_search_controls(arguments: dict) -> list:
+    query = arguments["query"].strip()
+    if not query:
+        return tool_result_content("Search query cannot be empty.")
+
+    limit = min(int(arguments.get("limit", 25)), 50)
+    pattern = f"%{query}%"
+    conn = get_connection()
+
+    rows = conn.run(
+        """
+        SELECT c.control_id, c.title, f.abbreviation AS family,
+               c.is_enhancement,
+               CASE
+                   WHEN c.title ILIKE :pat THEN 'title'
+                   WHEN c.description ILIKE :pat THEN 'description'
+                   ELSE 'guidance'
+               END AS match_field,
+               CASE
+                   WHEN c.title ILIKE :pat THEN c.title
+                   WHEN c.description ILIKE :pat THEN LEFT(c.description, 200)
+                   ELSE LEFT(c.guidance, 200)
+               END AS snippet
+        FROM nist_controls c
+        JOIN nist_families f ON f.family_id = c.family_id
+        WHERE c.title ILIKE :pat
+           OR c.description ILIKE :pat
+           OR c.guidance ILIKE :pat
+        ORDER BY
+            CASE WHEN c.title ILIKE :pat THEN 0
+                 WHEN c.description ILIKE :pat THEN 1
+                 ELSE 2
+            END,
+            c.is_enhancement,
+            c.control_id
+        LIMIT :lim
+        """,
+        pat=pattern,
+        lim=limit,
+    )
+
+    if not rows:
+        return tool_result_content(f"No controls found matching '{query}'.")
+
+    results = [
+        {
+            "control_id": r[0].upper(),
+            "title": r[1],
+            "family": r[2],
+            "is_enhancement": r[3],
+            "match_field": r[4],
+            "snippet": r[5],
+        }
+        for r in rows
+    ]
+    result = {
+        "query": query,
+        "count": len(results),
+        "results": results,
+    }
+    return tool_result_content(json.dumps(result, indent=2))
+
+
 # ── Phase 2 handlers ─────────────────────────────────────────────────────────
 
 def handle_get_ai_rmf_subcategory(arguments: dict) -> list:
@@ -320,6 +383,7 @@ TOOL_DISPATCH = {
     "get_control": handle_get_control,
     "get_control_family": handle_get_control_family,
     "get_baseline": handle_get_baseline,
+    "search_controls": handle_search_controls,
     "get_ai_rmf_subcategory": handle_get_ai_rmf_subcategory,
     "get_crosswalk": handle_get_crosswalk,
     "get_crosswalk_by_family": handle_get_crosswalk_by_family,
