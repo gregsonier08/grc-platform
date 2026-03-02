@@ -85,8 +85,8 @@ aws lambda invoke --function-name grc-dev-oscal-loader \
 Seed files must be uploaded to S3 first:
 
 ```bash
-aws s3 cp core/db/schema.sql s3://grc-dev-oscal-data-995433633495/seed/schema.sql
-aws s3 sync core/db/seed/ s3://grc-dev-oscal-data-995433633495/seed/ --exclude "*" --include "*.sql"
+aws s3 cp core/db/schema.sql s3://grc-dev-oscal-data-<YOUR-ACCOUNT-ID>/seed/schema.sql
+aws s3 sync core/db/seed/ s3://grc-dev-oscal-data-<YOUR-ACCOUNT-ID>/seed/ --exclude "*" --include "*.sql"
 ```
 
 ### Automated updates via GitHub Actions
@@ -130,6 +130,6 @@ Add the API key to your Claude Desktop MCP server config (`~/Library/Application
 | Resource     | Value                                                         |
 |--------------|---------------------------------------------------------------|
 | Region       | us-west-2                                                     |
-| API endpoint | `https://0tdx0fif8b.execute-api.us-west-2.amazonaws.com/mcp`  |
-| RDS endpoint | `grc-dev-db.cbtyvi6qukg0.us-west-2.rds.amazonaws.com`         |
+| API endpoint | `https://<YOUR-API-ID>.execute-api.us-west-2.amazonaws.com/mcp`  |
+| RDS endpoint | `grc-dev-db.<YOUR-RDS-ID>.us-west-2.rds.amazonaws.com`         |
 | Lambda       | `grc-dev-mcp-server`                                          |

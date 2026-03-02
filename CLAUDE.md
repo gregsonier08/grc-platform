@@ -88,12 +88,12 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
 ### AWS — Live (Codified in CloudFormation)
 
 - **Live AWS deployment** — all 7 MCP tools verified working:
-  - API Gateway endpoint: `https://0tdx0fif8b.execute-api.us-west-2.amazonaws.com/mcp`
+  - API Gateway endpoint: `https://<YOUR-API-ID>.execute-api.us-west-2.amazonaws.com/mcp`
   - Lambda: `grc-dev-mcp-server` — handler `src.lambda_handler.handler` (modular `src/` package)
-  - RDS endpoint: `grc-dev-db.cbtyvi6qukg0.us-west-2.rds.amazonaws.com`
+  - RDS endpoint: `grc-dev-db.<YOUR-RDS-ID>.us-west-2.rds.amazonaws.com`
   - Database name: `grcplatform`, Admin user: `grcadmin`
-  - VPC: `grc-dev-vpc` (vpc-058442a39bf1c121d, 10.0.0.0/16)
-  - Security group: `grc-dev-rds-sg` (sg-06b2f289d5824ace9)
+  - VPC: `grc-dev-vpc` (<YOUR-VPC-ID>, 10.0.0.0/16)
+  - Security group: `grc-dev-rds-sg` (<YOUR-SG-ID>)
 - **API key authentication** — MCP endpoint requires `x-api-key` header. Key stored as Lambda env var (`API_KEY`). Auth skipped when env var is empty (Docker/local path). Uses `hmac.compare_digest()` for timing-safe comparison.
 - **CloudFormation stacks** (3 stacks in `deploy/aws/`):
   - `vpc.yaml` — VPC, private subnets, security groups, VPC endpoints
@@ -216,8 +216,8 @@ Set via `deploy/docker/.env` (copied from `.env.example`).
 ### AWS Lambda Path
 
 ``` text
-DB_SECRET_ARN=arn:aws:secretsmanager:us-west-2:995433633495:secret:...
-DB_HOST=grc-dev-db.cbtyvi6qukg0.us-west-2.rds.amazonaws.com
+DB_SECRET_ARN=arn:aws:secretsmanager:us-west-2:<YOUR-ACCOUNT-ID>:secret:...
+DB_HOST=grc-dev-db.<YOUR-RDS-ID>.us-west-2.rds.amazonaws.com
 DB_NAME=grcplatform
 ENVIRONMENT=dev
 API_KEY=<secret>  # Required — requests without valid x-api-key header get 403

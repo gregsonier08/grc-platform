@@ -13,7 +13,7 @@ permissions:
 
 env:
   AWS_REGION: us-west-2
-  OSCAL_BUCKET: grc-dev-oscal-data-995433633495
+  OSCAL_BUCKET: grc-dev-oscal-data-<YOUR-ACCOUNT-ID>
   LOADER_FUNCTION: grc-dev-oscal-loader
 
 jobs:
