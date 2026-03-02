@@ -140,10 +140,188 @@ def handle_get_baseline(arguments: dict) -> list:
     return tool_result_content(json.dumps(controls, indent=2))
 
 
+# ── Phase 2 handlers ─────────────────────────────────────────────────────────
+
+def handle_get_ai_rmf_subcategory(arguments: dict) -> list:
+    subcategory_id = arguments["subcategory_id"].strip()
+    conn = get_connection()
+
+    rows = conn.run(
+        """
+        SELECT s.subcategory_id, s.description,
+               c.category_id, c.name AS category_name, c.description AS category_desc,
+               f.function_id, f.name AS function_name, f.description AS function_desc
+        FROM ai_rmf_subcategories s
+        JOIN ai_rmf_categories c ON c.category_id = s.category_id
+        JOIN ai_rmf_functions f ON f.function_id = c.function_id
+        WHERE s.subcategory_id = :sid
+        """,
+        sid=subcategory_id,
+    )
+    if not rows:
+        return tool_result_content(f"AI RMF subcategory '{subcategory_id}' not found.")
+
+    r = rows[0]
+    result = {
+        "subcategory_id": r[0],
+        "description": r[1],
+        "category": {
+            "category_id": r[2],
+            "name": r[3],
+            "description": r[4],
+        },
+        "function": {
+            "function_id": r[5],
+            "name": r[6],
+            "description": r[7],
+        },
+    }
+    return tool_result_content(json.dumps(result, indent=2))
+
+
+def handle_get_crosswalk(arguments: dict) -> list:
+    subcategory_id = arguments["subcategory_id"].strip()
+    conn = get_connection()
+
+    rows = conn.run(
+        """
+        SELECT m.control_id, c.title, f.abbreviation AS family,
+               m.coverage_level, m.rationale, m.guidance, m.evidence_types
+        FROM crosswalk_mappings m
+        JOIN nist_controls c ON c.control_id = m.control_id
+        JOIN nist_families f ON f.family_id = c.family_id
+        WHERE m.subcategory_id = :sid
+        ORDER BY m.coverage_level, m.control_id
+        """,
+        sid=subcategory_id,
+    )
+    if not rows:
+        return tool_result_content(
+            f"No crosswalk mappings found for subcategory '{subcategory_id}'."
+        )
+
+    mappings = [
+        {
+            "control_id": r[0].upper(),
+            "title": r[1],
+            "family": r[2],
+            "coverage_level": r[3],
+            "rationale": r[4],
+            "guidance": r[5],
+            "evidence_types": r[6] or [],
+        }
+        for r in rows
+    ]
+    return tool_result_content(json.dumps(mappings, indent=2))
+
+
+def handle_get_crosswalk_by_family(arguments: dict) -> list:
+    family = _normalize_family(arguments["family"])
+    conn = get_connection()
+
+    rows = conn.run(
+        """
+        SELECT m.subcategory_id, m.control_id, c.title,
+               m.coverage_level, m.rationale, m.guidance, m.evidence_types,
+               s.description AS subcategory_desc,
+               cat.name AS category_name,
+               fn.function_id
+        FROM crosswalk_mappings m
+        JOIN nist_controls c ON c.control_id = m.control_id
+        JOIN nist_families f ON f.family_id = c.family_id
+        JOIN ai_rmf_subcategories s ON s.subcategory_id = m.subcategory_id
+        JOIN ai_rmf_categories cat ON cat.category_id = s.category_id
+        JOIN ai_rmf_functions fn ON fn.function_id = cat.function_id
+        WHERE f.family_id = :fam
+        ORDER BY m.subcategory_id, m.control_id
+        """,
+        fam=family,
+    )
+    if not rows:
+        return tool_result_content(
+            f"No crosswalk mappings found for family '{family.upper()}'."
+        )
+
+    mappings = [
+        {
+            "subcategory_id": r[0],
+            "subcategory_description": r[7],
+            "ai_rmf_function": r[9],
+            "ai_rmf_category": r[8],
+            "control_id": r[1].upper(),
+            "control_title": r[2],
+            "coverage_level": r[3],
+            "rationale": r[4],
+            "guidance": r[5],
+            "evidence_types": r[6] or [],
+        }
+        for r in rows
+    ]
+    return tool_result_content(json.dumps(mappings, indent=2))
+
+
+def handle_get_crosswalk_gaps(arguments: dict) -> list:
+    function_filter = (arguments.get("function") or "").strip().upper() or None
+    conn = get_connection()
+
+    if function_filter:
+        rows = conn.run(
+            """
+            SELECT s.subcategory_id, s.description,
+                   c.category_id, c.name AS category_name, f.function_id
+            FROM ai_rmf_subcategories s
+            JOIN ai_rmf_categories c ON c.category_id = s.category_id
+            JOIN ai_rmf_functions f ON f.function_id = c.function_id
+            WHERE f.function_id = :fn
+              AND NOT EXISTS (
+                  SELECT 1 FROM crosswalk_mappings m
+                  WHERE m.subcategory_id = s.subcategory_id
+              )
+            ORDER BY s.subcategory_id
+            """,
+            fn=function_filter,
+        )
+    else:
+        rows = conn.run(
+            """
+            SELECT s.subcategory_id, s.description,
+                   c.category_id, c.name AS category_name, f.function_id
+            FROM ai_rmf_subcategories s
+            JOIN ai_rmf_categories c ON c.category_id = s.category_id
+            JOIN ai_rmf_functions f ON f.function_id = c.function_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM crosswalk_mappings m
+                WHERE m.subcategory_id = s.subcategory_id
+            )
+            ORDER BY s.subcategory_id
+            """
+        )
+
+    gaps = [
+        {
+            "subcategory_id": r[0],
+            "description": r[1],
+            "category_id": r[2],
+            "category_name": r[3],
+            "function": r[4],
+        }
+        for r in rows
+    ]
+    summary = f"{len(gaps)} unmapped subcategories"
+    if function_filter:
+        summary += f" in {function_filter}"
+    result = {"summary": summary, "gaps": gaps}
+    return tool_result_content(json.dumps(result, indent=2))
+
+
 # ── dispatch table ────────────────────────────────────────────────────────────
 
 TOOL_DISPATCH = {
     "get_control": handle_get_control,
     "get_control_family": handle_get_control_family,
     "get_baseline": handle_get_baseline,
+    "get_ai_rmf_subcategory": handle_get_ai_rmf_subcategory,
+    "get_crosswalk": handle_get_crosswalk,
+    "get_crosswalk_by_family": handle_get_crosswalk_by_family,
+    "get_crosswalk_gaps": handle_get_crosswalk_gaps,
 }

@@ -54,61 +54,73 @@ ALL_TOOLS = [
             "required": ["level"],
         },
     },
-    # Phase 2 tools — uncomment once Phase 2 tables are populated
-    # {
-    #     "name": "get_ai_rmf_subcategory",
-    #     "description": "Look up an AI RMF subcategory with its parent category and function.",
-    #     "inputSchema": {
-    #         "type": "object",
-    #         "properties": {
-    #             "subcategory_id": {
-    #                 "type": "string",
-    #                 "description": "Subcategory ID, e.g. 'GOVERN 1.1'",
-    #             }
-    #         },
-    #         "required": ["subcategory_id"],
-    #     },
-    # },
-    # {
-    #     "name": "get_crosswalk",
-    #     "description": "Get all NIST 800-53 controls mapped to an AI RMF subcategory.",
-    #     "inputSchema": {
-    #         "type": "object",
-    #         "properties": {
-    #             "subcategory_id": {
-    #                 "type": "string",
-    #                 "description": "AI RMF subcategory ID, e.g. 'GOVERN 1.1'",
-    #             }
-    #         },
-    #         "required": ["subcategory_id"],
-    #     },
-    # },
-    # {
-    #     "name": "get_crosswalk_by_family",
-    #     "description": "Get all AI RMF mappings for a given NIST 800-53 control family.",
-    #     "inputSchema": {
-    #         "type": "object",
-    #         "properties": {
-    #             "family": {
-    #                 "type": "string",
-    #                 "description": "Two-letter family abbreviation, e.g. 'AC'",
-    #             }
-    #         },
-    #         "required": ["family"],
-    #     },
-    # },
-    # {
-    #     "name": "get_crosswalk_gaps",
-    #     "description": "Find AI RMF subcategories with no mapped 800-53 controls.",
-    #     "inputSchema": {
-    #         "type": "object",
-    #         "properties": {
-    #             "function": {
-    #                 "type": "string",
-    #                 "description": "Optional: filter by AI RMF function (GOVERN, MAP, MEASURE, MANAGE)",
-    #             }
-    #         },
-    #         "required": [],
-    #     },
-    # },
+    {
+        "name": "get_ai_rmf_subcategory",
+        "description": (
+            "Look up a single NIST AI RMF 1.0 subcategory by its ID. "
+            "Returns the subcategory description along with its parent category and function."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "subcategory_id": {
+                    "type": "string",
+                    "description": "Subcategory ID, e.g. 'GOVERN 1.1' or 'MAP 2.3'",
+                }
+            },
+            "required": ["subcategory_id"],
+        },
+    },
+    {
+        "name": "get_crosswalk",
+        "description": (
+            "Get all NIST SP 800-53 Rev 5 controls mapped to a given AI RMF 1.0 subcategory, "
+            "including coverage level, mapping rationale, implementation guidance, and evidence types."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "subcategory_id": {
+                    "type": "string",
+                    "description": "AI RMF subcategory ID, e.g. 'GOVERN 1.1'",
+                }
+            },
+            "required": ["subcategory_id"],
+        },
+    },
+    {
+        "name": "get_crosswalk_by_family",
+        "description": (
+            "Get all AI RMF 1.0 subcategory mappings for a given NIST 800-53 control family. "
+            "Returns every mapped subcategory with coverage level, rationale, and guidance."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "family": {
+                    "type": "string",
+                    "description": "Two-letter family abbreviation, e.g. 'AC', 'AU', 'CA'",
+                }
+            },
+            "required": ["family"],
+        },
+    },
+    {
+        "name": "get_crosswalk_gaps",
+        "description": (
+            "Find AI RMF 1.0 subcategories that have no mapped NIST 800-53 controls, "
+            "indicating coverage gaps. Optionally filter by AI RMF function."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "function": {
+                    "type": "string",
+                    "description": "Optional: filter by AI RMF function — GOVERN, MAP, MEASURE, or MANAGE",
+                    "enum": ["GOVERN", "MAP", "MEASURE", "MANAGE"],
+                }
+            },
+            "required": [],
+        },
+    },
 ]
