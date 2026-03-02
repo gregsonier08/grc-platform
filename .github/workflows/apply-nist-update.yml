@@ -1,0 +1,67 @@
+name: Apply NIST Update to RDS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/db/schema.sql'
+      - 'core/db/seed/0*.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  OSCAL_BUCKET: grc-dev-oscal-data-995433633495
+  LOADER_FUNCTION: grc-dev-oscal-loader
+
+jobs:
+  apply:
+    name: Upload seeds and invoke OSCAL loader
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload schema and seed files to S3
+        run: |
+          echo "Uploading schema.sql..."
+          aws s3 cp core/db/schema.sql s3://${OSCAL_BUCKET}/seed/schema.sql
+
+          echo "Uploading seed files..."
+          aws s3 sync core/db/seed/ s3://${OSCAL_BUCKET}/seed/ \
+            --exclude "*" --include "*.sql"
+
+          echo "Listing uploaded files:"
+          aws s3 ls s3://${OSCAL_BUCKET}/seed/ | wc -l
+          echo "files uploaded."
+
+      - name: Invoke OSCAL Loader Lambda
+        run: |
+          echo "Invoking ${LOADER_FUNCTION} with reseed action..."
+          aws lambda invoke \
+            --function-name ${LOADER_FUNCTION} \
+            --payload '{"action": "reseed"}' \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/response.json
+
+          echo "Lambda response:"
+          cat /tmp/response.json | python3 -m json.tool
+
+          # Check for errors
+          STATUS=$(python3 -c "import json; print(json.load(open('/tmp/response.json'))['status'])")
+          if [ "$STATUS" != "ok" ]; then
+            echo "ERROR: OSCAL loader returned status: $STATUS"
+            exit 1
+          fi
+
+          echo "OSCAL loader completed successfully."

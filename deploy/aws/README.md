@@ -51,6 +51,7 @@ echo "Save your API key: ${API_KEY}"
 
 # 4. Deploy Lambda code (CloudFormation only creates the function infrastructure)
 ./scripts/deploy_lambda.sh ${ENV}
+./scripts/deploy_oscal_loader.sh ${ENV}
 
 # 5. Seed the database
 ./scripts/seed_rds.sh ${ENV}
@@ -62,7 +63,40 @@ When MCP server code changes (no infrastructure changes needed):
 
 ```bash
 ./scripts/deploy_lambda.sh dev
+./scripts/deploy_oscal_loader.sh dev
 ```
+
+## OSCAL Loader Lambda
+
+The OSCAL loader reads seed SQL files from S3 and applies them to RDS. It supports two actions:
+
+```bash
+# Full reseed — drops all tables, applies schema, loads all seed files
+aws lambda invoke --function-name grc-dev-oscal-loader \
+  --payload '{"action": "reseed"}' --cli-binary-format raw-in-base64-out \
+  --region us-west-2 /dev/stdout
+
+# Status — check current catalog version in RDS
+aws lambda invoke --function-name grc-dev-oscal-loader \
+  --payload '{"action": "status"}' --cli-binary-format raw-in-base64-out \
+  --region us-west-2 /dev/stdout
+```
+
+Seed files must be uploaded to S3 first:
+
+```bash
+aws s3 cp core/db/schema.sql s3://grc-dev-oscal-data-995433633495/seed/schema.sql
+aws s3 sync core/db/seed/ s3://grc-dev-oscal-data-995433633495/seed/ --exclude "*" --include "*.sql"
+```
+
+### Automated updates via GitHub Actions
+
+The `apply-nist-update.yml` workflow automatically uploads seed files to S3 and invokes the OSCAL loader when NIST seed files change on `main`. This is triggered after merging a PR from the weekly `sync-nist.yml` workflow.
+
+**Required GitHub secrets** (set in repo Settings > Secrets):
+
+- `AWS_ACCESS_KEY_ID` — IAM user with `s3:PutObject` on the OSCAL bucket and `lambda:InvokeFunction` on the loader
+- `AWS_SECRET_ACCESS_KEY` — corresponding secret key
 
 ## Architecture notes
 

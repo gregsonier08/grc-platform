@@ -99,8 +99,11 @@ PostgreSQL. Schema defined in `core/db/schema.sql`. Seed data in `core/db/seed/`
   - `vpc.yaml` — VPC, private subnets, security groups, VPC endpoints
   - `data.yaml` — RDS PostgreSQL, Secrets Manager, S3
   - `compute.yaml` — Lambda (MCP server + OSCAL loader), API Gateway HTTP API, `ApiKey` parameter
+- **OSCAL Loader Lambda** — `grc-dev-oscal-loader` reads seed SQL from S3, applies to RDS. Supports `reseed` (full reload) and `status` (check version) actions. Code in `core/oscal-loader/`.
+- **Automated NIST updates** — `sync-nist.yml` opens PR on catalog changes (weekly). `apply-nist-update.yml` uploads seeds to S3 and invokes the loader after merge to `main`.
 - **Deployment scripts** (`scripts/`):
-  - `deploy_lambda.sh` — builds and uploads the `src/` package to Lambda
+  - `deploy_lambda.sh` — builds and uploads the MCP server `src/` package to Lambda
+  - `deploy_oscal_loader.sh` — builds and uploads the OSCAL loader package to Lambda
   - `seed_rds.sh` — drops/recreates tables and loads all seed files into RDS
 - **Original Lambda handler**: `core/mcp-server/handler_original.py` (reference only — no longer deployed)
 
@@ -128,7 +131,8 @@ grc-platform/
 ├── .github/
 │   ├── workflows/
 │   │   ├── publish-docker.yml          # Build + push multi-platform image to Docker Hub
-│   │   └── sync-nist.yml               # Weekly NIST catalog sync
+│   │   ├── sync-nist.yml               # Weekly NIST catalog sync
+│   │   └── apply-nist-update.yml       # Post-merge: upload seeds to S3, invoke OSCAL loader
 │   └── rulesets/
 │       └── main-protection.json        # Branch protection ruleset
 ├── core/
@@ -138,6 +142,9 @@ grc-platform/
 │   │   ├── sources/                    # NIST OSCAL JSON source files (v5.2.0)
 │   │   ├── seed/                       # SQL insert files for reference data
 │   │   └── migrations/                 # Delta SQL for upgrading existing deployments
+│   ├── oscal-loader/
+│   │   ├── handler.py                 # OSCAL Loader Lambda — reads seeds from S3, loads RDS
+│   │   └── db.py                      # Connection management (copy of mcp-server/src/db.py)
 │   └── mcp-server/
 │       ├── handler_original.py         # Original single-file Lambda (reference only — no longer deployed)
 │       ├── Dockerfile
@@ -165,7 +172,8 @@ grc-platform/
 │   ├── convert_nist_oscal.py           # OSCAL JSON → SQL seed files
 │   ├── fetch_nist_sources.py           # Download + compare NIST sources from GitHub
 │   ├── generate_nist_migration.py      # Generate delta SQL for NIST catalog updates
-│   ├── deploy_lambda.sh               # Build + deploy Lambda code package
+│   ├── deploy_lambda.sh               # Build + deploy MCP server Lambda package
+│   ├── deploy_oscal_loader.sh         # Build + deploy OSCAL loader Lambda package
 │   └── seed_rds.sh                     # Drop/recreate tables + seed RDS
 └── docs/
     ├── architecture.md
@@ -176,7 +184,7 @@ grc-platform/
 
 ## Next Steps (Priority Order)
 
-1. **OSCAL loader Lambda** — Automate loading NIST catalog updates from S3 into RDS (infrastructure exists in CloudFormation, code is placeholder)
+1. **Set up GitHub Actions AWS credentials** — Add `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` secrets to the GitHub repo for the `apply-nist-update.yml` workflow
 2. **Add more MCP tools** — Search across controls, compare baselines, get enhancement details
 3. **Add tests** — Unit tests for handlers, integration tests for the MCP endpoint
 
